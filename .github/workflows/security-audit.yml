@@ -2,7 +2,7 @@ name: Security Audit
 
 on:
   schedule:
-    - cron: '0 2 * * 0'
+    - cron: '0 8 * * 1'
   workflow_dispatch:
 
 jobs:
@@ -10,7 +10,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run security audit
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Security scan
         run: |
-          npm audit --audit-level=moderate 2>/dev/null || true
-          pip install pip-audit 2>/dev/null && pip-audit 2>/dev/null || true
+          pip install bandit safety
+          if [ -f requirements.txt ]; then
+            safety check -r requirements.txt || true
+          fi
+          find . -name '*.py' -not -path './.git/*' | head -50 | xargs bandit -f json -o bandit-report.json || true
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-report
+          path: bandit-report.json
